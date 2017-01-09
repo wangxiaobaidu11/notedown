@@ -124,9 +124,12 @@ class MarkdownReader(NotebookReader):
                                cell contents
         """
         if not code_regex:
-            self.code_regex = r"({}|{})".format(self.fenced_regex,
-                                                self.indented_regex)
+            logging.debug("self.code_regex!")
+            # self.code_regex = r"({}|{})".format(self.fenced_regex,
+            #                                    self.indented_regex)
+            self.code_regex = self.fenced_regex
         elif code_regex == 'fenced':
+            logging.debug("self.code_regex fenced!")
             self.code_regex = self.fenced_regex
         elif code_regex == 'indented':
             self.code_regex = self.indented_regex
@@ -146,6 +149,10 @@ class MarkdownReader(NotebookReader):
 
     def new_code_block(self, **kwargs):
         """Create a new code block."""
+        # if kwargs.has_key('attributes'):
+        #   logging.debug('new_code_block **kwargs attributes %s', kwargs['attributes'])
+        #   logging.debug('new_code_block **kwargs attributes %s', kwargs['content'])
+        logging.debug('new_code_block self.code %s', self.code)
         proto = {'content': '',
                  'type': self.code,
                  'IO': '',
@@ -184,7 +191,8 @@ class MarkdownReader(NotebookReader):
         Currently just strips whitespace from the beginning
         and end of the block.
         """
-        block['content'] = block['content'].strip()
+        #block['content'] = block['content'].strip()
+        block['content'] = block['content']
 
     def process_code_block(self, block):
         """Parse block attributes"""
@@ -261,8 +269,11 @@ class MarkdownReader(NotebookReader):
         We should switch to an external markdown library if this
         gets much more complicated!
         """
+        logging.debug('parse_blocks code text: %s', text)
         code_matches = [m for m in self.code_pattern.finditer(text)]
-
+        for m in code_matches:
+            logging.debug('code_matches m start location: %s', m.start())
+            logging.debug('code_matches m end location: %s', m.end())
         # determine where the limits of the non code bits are
         # based on the code block edges
         text_starts = [0] + [m.end() for m in code_matches]
@@ -305,9 +316,13 @@ class MarkdownReader(NotebookReader):
     def create_code_cell(block):
         """Create a notebook code cell from a block."""
         code_cell = nbbase.new_code_cell(source=block['content'])
-
         attr = block['attributes']
         if not attr.is_empty:
+            # if ''.join(str(e) for e in attr['classes']).find('shell') != -1:
+            if attr['classes'][0] == 'shell':
+                code_cell.source = '!' + code_cell.source.strip()
+                # source_split = code_cell.source.split('\n')
+                # for item in source_split:
             code_cell.metadata \
                 = nbbase.NotebookNode({'attributes': attr.to_dict()})
             execution_count = attr.kvs.get('n')
@@ -315,7 +330,6 @@ class MarkdownReader(NotebookReader):
                 code_cell.execution_count = None
             else:
                 code_cell.execution_count = int(execution_count)
-
         return code_cell
 
     @staticmethod
@@ -324,6 +338,29 @@ class MarkdownReader(NotebookReader):
         kwargs = {'cell_type': block['type'],
                   'source': block['content']}
         markdown_cell = nbbase.new_markdown_cell(**kwargs)
+        # \n split
+        s_split = markdown_cell.source.split('\n')
+        target_s = ''
+        for index in range(len(s_split)):
+            logging.debug('create_markdown_cell ' + str(index + 1) + ' line: %s', s_split[index])
+            if re.search(r"^[0-9]+.\s", s_split[index], re.MULTILINE):
+                item = s_split[index].replace(' ', '', 1)
+                item = item + '<br/>'
+            elif s_split[index].strip().startswith('- '):
+                item = s_split[index].strip()
+            elif s_split[index].strip().startswith('$$') and s_split[index].strip().endswith('$$'):
+                item = s_split[index]
+                if index != 0 and s_split[index - 1].strip() != '':
+                    item =  '\n' + item
+                elif s_split[index + 1].strip() != '':
+                    item = item + '\n'
+            else:
+                item = s_split[index]
+            if target_s == '':
+                target_s = target_s + item
+            else:
+                target_s = target_s + '\n' + item
+        markdown_cell.source = target_s
         return markdown_cell
 
     @staticmethod
@@ -340,6 +377,7 @@ class MarkdownReader(NotebookReader):
         for block in blocks:
             if (block['type'] == self.code) and (block['IO'] == 'input'):
                 code_cell = self.create_code_cell(block)
+                # print self.code
                 cells.append(code_cell)
 
             elif (block['type'] == self.code and
@@ -362,6 +400,26 @@ class MarkdownReader(NotebookReader):
 
         Returns a notebook.
         """
+        # tab replace 4 blank
+        # logging.debug('to_notebook md string: %s', s)
+        s = s.replace('\t','    ');
+        # read every line, Line at the beginning for ``` is code delete blank
+        s_split = s.split('\n')
+        target_s = ''
+        for index in range(len(s_split)):
+            logging.debug('The ' + str(index + 1) + ' line: %s', s_split[index])
+            if s_split[index].strip().startswith('```'):
+                item = s_split[index].strip()
+                logging.debug('The' + str(index + 1) + ' item: %s', item)
+            elif s_split[index].strip() == '':
+                item = ''
+                logging.debug('The' + str(index + 1) + ' item: %s', item)
+                # continue
+            else:
+                item = s_split[index]
+                logging.debug('The ' + str(index + 1) + ' item: %s', item)
+            target_s = target_s + '\n' + item
+        s = target_s
         all_blocks = self.parse_blocks(s)
         if self.pre_code_block['content']:
             # TODO: if first block is markdown, place after?
