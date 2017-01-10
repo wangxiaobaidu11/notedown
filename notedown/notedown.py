@@ -307,11 +307,12 @@ class MarkdownReader(NotebookReader):
         code_cell = nbbase.new_code_cell(source=block['content'])
         attr = block['attributes']
         if not attr.is_empty:
+            # if ''.join(str(e) for e in attr['classes']).find('shell') != -1:
             # deal shell command
             if attr['classes'][0] == 'shell':
                 code_cell.source = '!' + code_cell.source.strip()
-                # to do understand shell command
                 # source_split = code_cell.source.split('\n')
+                # for item in source_split:
             code_cell.metadata \
                 = nbbase.NotebookNode({'attributes': attr.to_dict()})
             execution_count = attr.kvs.get('n')
@@ -395,18 +396,10 @@ class MarkdownReader(NotebookReader):
         # For PaddlePadle modify
         # 1. replace tab for 4 blank
         s = s.replace('\t','    ');
-        s_split = s.split('\n')
-        target_s = ''
         # 2. the head of ``` command no allow \t \s
-        for index in range(len(s_split)):
-            if s_split[index].strip().startswith('```'):
-                item = s_split[index].strip()
-            elif s_split[index].strip() == '':
-                item = ''
-            else:
-                item = s_split[index]
-            target_s = target_s + '\n' + item
-        s = target_s
+        s = re.sub(r'^\s+```', '```', s, 0, re.MULTILINE)
+        # 3. not allow ^\s+\n
+        s = re.sub(r'^\s+\n', '\n', s, 0, re.MULTILINE)
         all_blocks = self.parse_blocks(s)
         if self.pre_code_block['content']:
             # TODO: if first block is markdown, place after?

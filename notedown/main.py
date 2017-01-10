@@ -121,6 +121,7 @@ def ftdetect(filename):
 
 def command_line_parser():
     """Create parser for command line usage."""
+    logging.info("note down main py command_line_parser enter!")
     description = "Create an IPython notebook from markdown."
     example_use = "Example:  notedown some_markdown.md > new_notebook.ipynb"
     parser = argparse.ArgumentParser(description=description,
@@ -208,8 +209,8 @@ def command_line_parser():
 
 
 def main(args, help=''):
-    if args.debug:
-        logging.basicConfig(level=logging.DEBUG)
+    # if args.debug:
+    # logging.basicConfig(level=logging.DEBUG)
 
     if args.version:
         print(__version__)
@@ -251,12 +252,12 @@ def main(args, help=''):
     # reader and writer classes with args and kwargs to
     # instantiate with
     readers = {'notebook': nbformat,
-               'markdown': MarkdownReader(precode='\n'.join(args.precode),
+               'markdown': MarkdownReader(code_regex='fenced',
+                                          precode='\n'.join(args.precode),
                                           magic=args.magic,
                                           match=args.match,
                                           caption_comments=args.render)
                }
-
     writers = {'notebook': nbformat,
                'markdown': MarkdownWriter(template_file,
                                           strip_outputs=args.strip_outputs)
@@ -307,6 +308,7 @@ def main(args, help=''):
 
 
 def app():
+    # logging.basicConfig(level=logging.DEBUG)
     parser = command_line_parser()
     args = parser.parse_args()
     main(args, help=parser.format_help())
