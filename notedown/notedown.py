@@ -124,12 +124,9 @@ class MarkdownReader(NotebookReader):
                                cell contents
         """
         if not code_regex:
-            logging.debug("self.code_regex!")
-            # self.code_regex = r"({}|{})".format(self.fenced_regex,
-            #                                    self.indented_regex)
-            self.code_regex = self.fenced_regex
+            self.code_regex = r"({}|{})".format(self.fenced_regex,
+                                               self.indented_regex)
         elif code_regex == 'fenced':
-            logging.debug("self.code_regex fenced!")
             self.code_regex = self.fenced_regex
         elif code_regex == 'indented':
             self.code_regex = self.indented_regex
@@ -149,10 +146,6 @@ class MarkdownReader(NotebookReader):
 
     def new_code_block(self, **kwargs):
         """Create a new code block."""
-        # if kwargs.has_key('attributes'):
-        #   logging.debug('new_code_block **kwargs attributes %s', kwargs['attributes'])
-        #   logging.debug('new_code_block **kwargs attributes %s', kwargs['content'])
-        logging.debug('new_code_block self.code %s', self.code)
         proto = {'content': '',
                  'type': self.code,
                  'IO': '',
@@ -191,8 +184,7 @@ class MarkdownReader(NotebookReader):
         Currently just strips whitespace from the beginning
         and end of the block.
         """
-        #block['content'] = block['content'].strip()
-        block['content'] = block['content']
+        block['content'] = block['content'].strip()
 
     def process_code_block(self, block):
         """Parse block attributes"""
@@ -269,11 +261,8 @@ class MarkdownReader(NotebookReader):
         We should switch to an external markdown library if this
         gets much more complicated!
         """
-        logging.debug('parse_blocks code text: %s', text)
         code_matches = [m for m in self.code_pattern.finditer(text)]
-        for m in code_matches:
-            logging.debug('code_matches m start location: %s', m.start())
-            logging.debug('code_matches m end location: %s', m.end())
+
         # determine where the limits of the non code bits are
         # based on the code block edges
         text_starts = [0] + [m.end() for m in code_matches]
@@ -319,6 +308,7 @@ class MarkdownReader(NotebookReader):
         attr = block['attributes']
         if not attr.is_empty:
             # if ''.join(str(e) for e in attr['classes']).find('shell') != -1:
+            # deal shell command
             if attr['classes'][0] == 'shell':
                 code_cell.source = '!' + code_cell.source.strip()
                 # source_split = code_cell.source.split('\n')
@@ -342,18 +332,21 @@ class MarkdownReader(NotebookReader):
         s_split = markdown_cell.source.split('\n')
         target_s = ''
         for index in range(len(s_split)):
-            logging.debug('create_markdown_cell ' + str(index + 1) + ' line: %s', s_split[index])
             if re.search(r"^[0-9]+.\s", s_split[index], re.MULTILINE):
                 item = s_split[index].replace(' ', '', 1)
                 item = item + '<br/>'
             elif s_split[index].strip().startswith('- '):
                 item = s_split[index].strip()
+            # the head and end of formula must have \n
             elif s_split[index].strip().startswith('$$') and s_split[index].strip().endswith('$$'):
                 item = s_split[index]
-                if index != 0 and s_split[index - 1].strip() != '':
+                if index > 0 and s_split[index - 1].strip() != '' \
+                        and not target_s.endswith('\n'):
                     item =  '\n' + item
-                elif s_split[index + 1].strip() != '':
+                if (index + 1) < len(s_split) and s_split[index + 1].strip() != '':
                     item = item + '\n'
+            elif s_split[index].strip().startswith('<p align="center">'):
+                item = s_split[index].replace('<p align="center">', '<p align="center" style="text-align:center">')
             else:
                 item = s_split[index]
             if target_s == '':
@@ -400,24 +393,19 @@ class MarkdownReader(NotebookReader):
 
         Returns a notebook.
         """
-        # tab replace 4 blank
-        # logging.debug('to_notebook md string: %s', s)
+        # For PaddlePadle modify
+        # 1. replace tab for 4 blank
         s = s.replace('\t','    ');
-        # read every line, Line at the beginning for ``` is code delete blank
         s_split = s.split('\n')
         target_s = ''
+        # 2. the head of ``` command no allow \t \s
         for index in range(len(s_split)):
-            logging.debug('The ' + str(index + 1) + ' line: %s', s_split[index])
             if s_split[index].strip().startswith('```'):
                 item = s_split[index].strip()
-                logging.debug('The' + str(index + 1) + ' item: %s', item)
             elif s_split[index].strip() == '':
                 item = ''
-                logging.debug('The' + str(index + 1) + ' item: %s', item)
-                # continue
             else:
                 item = s_split[index]
-                logging.debug('The ' + str(index + 1) + ' item: %s', item)
             target_s = target_s + '\n' + item
         s = target_s
         all_blocks = self.parse_blocks(s)
@@ -471,15 +459,6 @@ class MarkdownWriter(NotebookWriter):
             self.exporter.register_filter(name, filter)
 
         self.exporter.template_file = os.path.basename(template_file)
-
-        logging.debug("Creating MarkdownWriter")
-        logging.debug(("MarkdownWriter: template_file = %s"
-                       % template_file))
-        logging.debug(("MarkdownWriter.exporter.template_file = %s"
-                       % self.exporter.template_file))
-        logging.debug(("MarkdownWriter.exporter.filters = %s"
-                       % self.exporter.environment.filters.keys()))
-
         self.strip_outputs = strip_outputs
         self.write_outputs = write_outputs
         self.output_dir = output_dir
