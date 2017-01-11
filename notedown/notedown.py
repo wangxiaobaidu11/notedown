@@ -307,12 +307,9 @@ class MarkdownReader(NotebookReader):
         code_cell = nbbase.new_code_cell(source=block['content'])
         attr = block['attributes']
         if not attr.is_empty:
-            # if ''.join(str(e) for e in attr['classes']).find('shell') != -1:
             # deal shell command
             if attr['classes'][0] == 'shell':
-                code_cell.source = '!' + code_cell.source.strip()
-                # source_split = code_cell.source.split('\n')
-                # for item in source_split:
+                code_cell.source = '%%bash\n' + code_cell.source.strip()
             code_cell.metadata \
                 = nbbase.NotebookNode({'attributes': attr.to_dict()})
             execution_count = attr.kvs.get('n')
@@ -328,7 +325,13 @@ class MarkdownReader(NotebookReader):
         kwargs = {'cell_type': block['type'],
                   'source': block['content']}
         markdown_cell = nbbase.new_markdown_cell(**kwargs)
-        # \n split
+        # Iterates over each line in the file to solve these problems
+        # 1.When the markdown file will be split into multiple files
+        # if the original file have serial number, it will go wrong
+        # 2.The front of some special symbols are not allowed to have a lot of whitespaces
+        # Escaping characters will go wrong
+        # 3.Center the fomula
+        # 4.Center the images and the description
         s_split = markdown_cell.source.split('\n')
         target_s = ''
         for index in range(len(s_split)):
@@ -370,7 +373,6 @@ class MarkdownReader(NotebookReader):
         for block in blocks:
             if (block['type'] == self.code) and (block['IO'] == 'input'):
                 code_cell = self.create_code_cell(block)
-                # print self.code
                 cells.append(code_cell)
 
             elif (block['type'] == self.code and
@@ -393,12 +395,14 @@ class MarkdownReader(NotebookReader):
 
         Returns a notebook.
         """
-        # For PaddlePadle modify
-        # 1. replace tab for 4 blank
-        s = s.replace('\t','    ');
-        # 2. the head of ``` command no allow \t \s
+        # PaddlePaddle notebook specific requirements:
+        # 1.Replace each tab by a sequence of 4 whitespaces, so to make inline Python code readable
+        s = s.replace('\t', '    ');
+        # 2.The head of ``` symbol is not allowed to have tabs and whitespaces
+        # because these symbols will affect the parsing code
         s = re.sub(r'^\s+```', '```', s, 0, re.MULTILINE)
-        # 3. not allow ^\s+\n
+        # 3.Blank lines are not allowed to have tabs and whitespaces
+        # because these symbols will affect the parsing code
         s = re.sub(r'^\s+\n', '\n', s, 0, re.MULTILINE)
         all_blocks = self.parse_blocks(s)
         if self.pre_code_block['content']:
