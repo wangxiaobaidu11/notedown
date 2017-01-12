@@ -250,6 +250,8 @@ def main(args, help=''):
 
     # reader and writer classes with args and kwargs to
     # instantiate with
+    # code_regex is fenced, it is able to differentiate between code and text
+    # code_regex is default, it isn 't able to differentiate between code and text for PaddlePaddle
     readers = {'notebook': nbformat,
                'markdown': MarkdownReader(code_regex='fenced',
                                           precode='\n'.join(args.precode),
